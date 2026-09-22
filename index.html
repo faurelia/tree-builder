@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tree Builder</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-10 px-4">
+  <div class="max-w-3xl mx-auto">
+
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+        📁 Flat Paths → Tree
+      </h1>
+      <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        Paste one file path per line to visualize the folder structure
+      </p>
+    </header>
+
+    <!-- Card -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden">
+
+      <!-- Input section -->
+      <div class="p-6 border-b border-slate-200 dark:border-slate-700">
+        <div class="flex items-center justify-between mb-3">
+          <label for="input" class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Paths <span class="text-slate-400 font-normal">(one per line)</span>
+          </label>
+          <button
+            id="clear"
+            class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+        <textarea
+          id="input"
+          spellcheck="false"
+          class="w-full h-40 px-4 py-3 font-mono text-sm rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-y transition-shadow"
+        >app/index.html
+app/about.html
+app/css/main.css
+app/css/theme/dark.css
+app/css/theme/light.css
+app/js/app.js
+app/js/lib/utils.js
+app/assets/images/logo.png
+app/assets/fonts/Inter.woff2</textarea>
+      </div>
+
+      <!-- Output section -->
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-3">
+          <label class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Tree
+          </label>
+          <button
+            id="copy"
+            class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 font-medium transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+            <span id="copy-label">Copy</span>
+          </button>
+        </div>
+        <pre id="output" class="font-mono text-sm leading-relaxed bg-slate-900 text-emerald-300 p-4 rounded-lg overflow-x-auto min-h-[8rem] whitespace-pre"></pre>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <p class="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+      Folders are listed first, then files — each sorted alphabetically.
+    </p>
+
+  </div>
+
+<script>
+function buildTree(paths) {
+  const root = {};
+
+  for (const path of paths) {
+    const parts = path.split('/').filter(Boolean);
+    let node = root;
+    for (const part of parts) {
+      if (!node[part]) node[part] = {};
+      node = node[part];
+    }
+  }
+
+  function render(node, prefix = '') {
+    const entries = Object.keys(node).sort((a, b) => {
+      const aIsFolder = Object.keys(node[a]).length > 0;
+      const bIsFolder = Object.keys(node[b]).length > 0;
+      if (aIsFolder !== bIsFolder) return aIsFolder ? -1 : 1;
+      return a.localeCompare(b);
+    });
+
+    let output = '';
+    entries.forEach((name, i) => {
+      const isLast = i === entries.length - 1;
+      const isFolder = Object.keys(node[name]).length > 0;
+      const connector = isLast ? '└── ' : '├── ';
+      const childPrefix = isLast ? '    ' : '│   ';
+
+      output += `${prefix}${connector}${name}${isFolder ? '/' : ''}\n`;
+
+      if (isFolder) {
+        output += render(node[name], prefix + childPrefix);
+      }
+    });
+
+    return output;
+  }
+
+  return render(root);
+}
+
+const inputEl = document.getElementById('input');
+const outputEl = document.getElementById('output');
+
+function convert() {
+  const paths = inputEl.value
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  if (!paths.length) {
+    outputEl.innerHTML = '<span class="text-slate-500 italic">No paths to display…</span>';
+    return;
+  }
+
+  outputEl.textContent = buildTree(paths);
+}
+
+document.getElementById('clear').addEventListener('click', () => {
+  inputEl.value = '';
+  convert();
+  inputEl.focus();
+});
+
+inputEl.addEventListener('input', convert);
+
+document.getElementById('copy').addEventListener('click', async () => {
+  const label = document.getElementById('copy-label');
+  try {
+    await navigator.clipboard.writeText(outputEl.textContent);
+    label.textContent = 'Copied!';
+    setTimeout(() => label.textContent = 'Copy', 1200);
+  } catch (e) {
+    label.textContent = 'Failed';
+    setTimeout(() => label.textContent = 'Copy', 1200);
+  }
+});
+
+convert();
+</script>
+
+</body>
+</html>
